@@ -1,0 +1,171 @@
+---
+title: "The League of DBs: 2023"
+output: 
+  html_document:
+    theme: bootstrap
+---
+
+<style>
+    body { background-color: #FAFAFA; }
+</style>    
+
+```{r intro, eval=TRUE, echo=FALSE, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(scales)
+library(ggridges)
+
+setwd("C:/Users/cmilb/Downloads")
+
+raw <- read.csv("FF.csv") # load raw file from yahoo export
+weeknum <- 9 # set week number (completed weeks)
+
+
+### Welcome Page
+
+# ![](C:/Users/cmilb/Downloads/middle-finger.png){width=1000}
+
+
+```
+
+## {.tabset}
+
+### 6th Seed Standings
+
+```{r main, eval=TRUE, echo=FALSE, warning = FALSE, message = FALSE}
+#### Process Raw File
+
+raw$row <- seq.int(nrow(raw))
+raw$mod <- raw$row %% 11 # mod function in order to more easily process data
+
+scores <- raw %>% # pull out the scores and organize
+  filter(mod %in% c(5, 7))
+scores <- scores[,c(1:(ncol(scores)-2))]
+scores <- as.data.frame(unlist(scores))
+
+teams <- raw %>% # pull out the teams and organize
+  filter(mod %in% c(1, 10))
+teams <- teams[,c(1:(ncol(teams)-2))]
+teams <- as.data.frame(unlist(teams))
+
+data <- cbind(teams, scores) # combine scores and teams
+
+data$week <- rep(c(1:weeknum), each = 14)
+data$id <- rep(c(0,1))
+
+for (i in 1:nrow(data)) # pull opponent score
+  {
+  data[i, 5] <- ifelse(data[i, 4] == 0, data[i + 1, 2], data[i - 1, 2])
+  }
+
+colnames(data)[1] <- "team"
+colnames(data)[2] <- "score"
+colnames(data)[5] <- "opp_score"
+
+data$score <- as.numeric(data$score)
+data$opp_score <- as.numeric(data$opp_score)
+
+data$win <- ifelse(data$score > data$opp_score, 1, 0)
+
+data <- data %>% # weekly ranks for 6th seed
+  arrange(week, score) %>%
+  group_by(week) %>%
+  mutate(wins_sixth = rank(score) - 1)
+
+### Summarize Data
+
+summary <- data %>% 
+  group_by(team) %>% 
+  summarise(wins = sum(win), wins_sixth = sum(wins_sixth))
+
+summary$losses <- weeknum - summary$wins
+summary$losses_sixth <- 13*weeknum - summary$wins_sixth
+
+summary$pct <- summary$wins/(summary$wins + summary$losses)
+summary$pct_sixth <- summary$wins_sixth/(summary$wins_sixth + summary$losses_sixth)
+
+summary$desa_factor <- summary$pct - summary$pct_sixth
+
+summary$pct <- percent(summary$pct, accuracy = .1)
+summary$pct_sixth <- percent(summary$pct_sixth, accuracy = .1)
+summary$desa_factor <- percent(summary$desa_factor, accuracy = .1)
+
+summary$WL <- paste(summary$wins, summary$losses, sep = "-")
+summary$WL_sixth <- paste(summary$wins_sixth, summary$losses_sixth, sep = "-")
+
+summary <- summary[with(summary, order(-wins_sixth)),]
+
+final <- summary[,c(1, 10, 9, 7, 6, 8)]
+colnames(final)[1] <- "Team"
+colnames(final)[2] <- "Wins/Losses (6th seed)"
+colnames(final)[3] <- "Wins/Losses (Regular)"
+colnames(final)[4] <- "Winning % (6th seed)"
+colnames(final)[5] <- "Winning % (Regular)"
+colnames(final)[6] <- "Desa Factor*"
+
+final %>%
+  DT::datatable(
+    rownames = FALSE,
+    extensions = 'Buttons',
+    options = list(dom = 'Blfrtip',
+                  pageLength = 25,
+                  orientation = "landscape",
+                  buttons = c('excel')
+    ))
+
+### Plots
+
+plot_ridges <- ggplot(data, aes(x = score, y = reorder(team, desc(team)))) +
+  geom_density_ridges(fill = "skyblue2") +
+  xlab("Value") +
+  ylab("Metric") +
+  ggtitle("FY24 Metric Distributions (Leader-Level)") +
+  xlim(0, 200) +
+  scale_x_continuous(breaks = c(25, 50, 75, 100, 125, 150, 175), labels =  c(25, 50, 75, 100, 125, 150, 175), limits = c(25, 175)) +
+  xlim(0, 200) + 
+  theme_minimal()
+
+
+```
+
+
+*Note: __Desa Factor__ defined as _Winning Pct (Regular)_ - _Winning Pct (Sixth Seed)_. A manager with a high Desa Factor can attribute much of their good fortune to luck.
+
+### Power Rankings
+
+1. 
+2. 
+3. 
+4. 
+5. 
+
+### Announcements
+
+This area will hold important announcements from the Telegram chat you may have missed among conversations about politics and Elon Musk.
+
+__Payouts__:
+
+First Place: $1,125  
+Second Place: $500  
+Third Place: $250  
+Fourth Place: $150  
+Consolation Winner: $75
+
+__Lineup Adjustments__:
+
+To clarify the position: 
+
+1. No changes to what's been done so far, including substituting Nick Folk in for Desa. 
+2. Going forward, Commissioners will only start any potential intervention process when a player starts an inactive player who is locked into the lineup. The process will be to look for any viable alternatives on the bench who have not yet played at that point (or whose games start within 30mins of each other given inactives will be known publicly by then) and start the highest projected alternative available. The alternatives will be considered based on the available bench at the point the inactive player is locked into the lineup to prevent abuse. Players on a bye will not be touched if left in a starting spot, given there is more than sufficient advance notice for mangers to make the change. Managers will also generally still have ability to make changes as the starting roster spot will not be locked. 
+3. If everyone plays their part which we kindly ask you to, that will result in the least intervention of this rule.
+
+__Shenanigans__:
+
+Shenanigans includes (but is not limited to) (a) intentionally losing games (b) dropping top players (c) collusion. Penalties for shenanigans will be at the discretion of the co-commissioners and will range from minor (loss of FAAB) to major (suspension, expulsion) for more egregious offenses or repeat offenders. If the co-commissioners cannot decide on a solution, each co-commissioner will present an option to be voted upon by the league.
+
+### Calendar
+
+__November 18, 2023__: Trade Deadline  
+__December 14, 2023__: Playoffs Begin  
+__December 31, 2023__: Season Ends  
+__September 1, 2024__: 2024 Draft (Location TBD)  
+
